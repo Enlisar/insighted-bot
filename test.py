@@ -1,6 +1,6 @@
 import logging
 import os
-from openai import OpenAI
+from groq import Groq
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -8,13 +8,13 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # CONFIGURATION
 # --------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GROQ_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
+if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise ValueError("❌ TELEGRAM_TOKEN or OPENAI_API_KEY not set in environment variables")
 
 # Groq client
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = Groq(api_key=GROQ_API_KEY)
 
 # Enable logging
 logging.basicConfig(
