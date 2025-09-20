@@ -6,8 +6,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --------------------------
 # CONFIGURATION
 # --------------------------
-TELEGRAM_TOKEN = "7593620257:AAEORZ3ElqqSWnagMZqnF742ZHT5rg5pxHU"
-openai.api_key = "sk-...yPQA"
+# TELEGRAM_TOKEN = "7593620257:AAEORZ3ElqqSWnagMZqnF742ZHT5rg5pxHU"
+# openai.api_key = "sk-...yPQA"
+
+import os
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 
 # Enable logging
 logging.basicConfig(
