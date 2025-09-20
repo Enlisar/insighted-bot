@@ -7,14 +7,13 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --------------------------
 # CONFIGURATION
 # --------------------------
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
     raise ValueError("❌ TELEGRAM_TOKEN or OPENAI_API_KEY not set in environment variables")
 
-# OpenAI client
+# Groq client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Enable logging
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 user_histories = {}
 
 # --------------------------
-# GPT FUNCTION
+# GPT FUNCTION USING GROQ
 # --------------------------
 async def generate_reply(user_id, user_message: str) -> str:
     if user_id not in user_histories:
@@ -42,9 +41,9 @@ async def generate_reply(user_id, user_message: str) -> str:
     # add user message
     user_histories[user_id].append({"role": "user", "content": user_message})
 
-    # get GPT reply
+    # get Groq chat reply
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="groq-3.5-mini",
         messages=user_histories[user_id],
         max_tokens=400,
         temperature=0.9
@@ -131,7 +130,7 @@ def main():
     # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("🤖 InsightED Bot is running...")
+    print("🤖 InsightED Bot is running with Groq...")
     app.run_polling()
 
 if __name__ == "__main__":
