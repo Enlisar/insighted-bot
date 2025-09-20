@@ -1,4 +1,5 @@
 import logging
+import os
 import openai
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -6,14 +7,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --------------------------
 # CONFIGURATION
 # --------------------------
-# TELEGRAM_TOKEN = "7593620257:AAEORZ3ElqqSWnagMZqnF742ZHT5rg5pxHU"
-# openai.api_key = "sk-...yPQA"
-
-import os
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+if not TELEGRAM_TOKEN or not openai.api_key:
+    raise ValueError("❌ TELEGRAM_TOKEN or OPENAI_API_KEY not set in environment variables")
 
 # Enable logging
 logging.basicConfig(
@@ -22,58 +20,61 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --------------------------
+# CHAT HISTORY STORAGE
+# --------------------------
+user_histories = {}
+
+# --------------------------
 # GPT FUNCTION
 # --------------------------
-async def generate_reply(user_message: str) -> str:
-    prompt = f"""
-    You are 'codered', a kind, polite, and motivational chatbot helping students 
-    overcome fear of low marks, low attendance, or socio-economic issues 
-    that might lead to dropping out. Your tone is warm, friendly, and uplifting.  
+async def generate_reply(user_id, user_message: str) -> str:
+    if user_id not in user_histories:
+        user_histories[user_id] = [
+            {"role": "system", "content":
+             "You are InsightED, a kind and motivational mentor helping students stay in school. "
+             "Be supportive, uplifting, and engaging. Encourage long conversations."}
+        ]
 
-    Goals:
-    - Encourage students with motivational quotes about never giving up.
-    - Suggest ways to improve academics & attendance.
-    - If relevant, mention scholarships (but remind them they can use /scholarships command for details).
-    - Help them realise and correct their mistakes without guilt-tripping.  
-    - Leave them feeling hopeful and motivated.  
+    # add user message
+    user_histories[user_id].append({"role": "user", "content": user_message})
 
-    Student said: "{user_message}"
-    InsightED reply:
-    """
-
+    # get GPT reply
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=300,
-        temperature=0.8
+        messages=user_histories[user_id],
+        max_tokens=400,
+        temperature=0.9
     )
-    return response.choices[0].message["content"]
+
+    reply = response.choices[0].message["content"]
+
+    # add bot reply to history
+    user_histories[user_id].append({"role": "assistant", "content": reply})
+
+    return reply
 
 # --------------------------
 # BOT COMMANDS
 # --------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "👋 Hello, I am *codered* 🌸 — your friendly study companion! \n\n"
-        "My purpose is to help you stay strong in your journey, even if you feel low about marks, "
-        "attendance, or finances. 💡\n\n"
-        "I’ll share motivational quotes, guidance, and information about scholarships that might help. "
-        "Just tell me what’s on your mind, and we’ll work it out together 🤝.\n\n"
+        "👋 Hello, I am *codered* 🌸 — your friendly study companion!\n\n"
+        "I’ll help you stay strong even if you feel low about marks, attendance, or finances. 💡\n\n"
         "👉 Use /scholarships to explore financial aid options."
     )
     await update.message.reply_markdown(welcome_text)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
-        "🌟 I am *codered2312*, your supportive guide!\n\n"
+        "🌟 I am *codered*, your supportive guide!\n\n"
         "💬 You can share your worries with me, like:\n"
         "- 'I am scared of failing in exams'\n"
         "- 'I have low attendance'\n"
         "- 'I may not afford fees'\n\n"
-        "Commands you can try:\n"
+        "Commands:\n"
         "👉 /start - Introduction\n"
-        "👉 /help - Guidance on how to talk to me\n"
-        "👉 /scholarships - Get a list of scholarship schemes 🎓"
+        "👉 /help - Guidance\n"
+        "👉 /scholarships - Scholarship list 🎓"
     )
     await update.message.reply_markdown(help_text)
 
@@ -92,7 +93,7 @@ async def scholarships(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1. [Fulbright Program](https://foreign.fulbrightonline.org/)\n"
         "2. [Gates Millennium Scholars](https://gmsp.org/)\n"
         "3. [FAFSA Grants](https://studentaid.gov/)\n\n"
-        "💡 *Pro Tip:* Apply early and keep documents (marksheets, ID, income certificate) ready."
+        "💡 Apply early & keep documents ready!"
     )
     await update.message.reply_markdown(scholarships_text)
 
@@ -100,40 +101,17 @@ async def scholarships(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # CHAT HANDLER
 # --------------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
     user_message = update.message.text
-    bot_reply = await generate_reply(user_message)
-    await update.message.reply_text(bot_reply)
 
+    logger.info(f"Message from {user_id}: {user_message}")
 
-
-# # store per-user history
-# user_histories = {}
-
-# async def generate_reply(user_id, user_message: str) -> str:
-#     if user_id not in user_histories:
-#         user_histories[user_id] = [
-#             {"role": "system", "content": 
-#              "You are InsightED, a kind and motivational mentor helping students stay in school. "
-#              "Be supportive, uplifting, and engaging. Encourage long conversations."}
-#         ]
-
-#     # add user message
-#     user_histories[user_id].append({"role": "user", "content": user_message})
-
-#     # get GPT reply
-#     response = openai.ChatCompletion.create(
-#         model="gpt-3.5-turbo",
-#         messages=user_histories[user_id],
-#         max_tokens=400,
-#         temperature=0.9
-#     )
-
-#     reply = response.choices[0].message["content"]
-
-#     # add bot reply to history
-#     user_histories[user_id].append({"role": "assistant", "content": reply})
-
-#     return reply    
+    try:
+        bot_reply = await generate_reply(user_id, user_message)
+        await update.message.reply_text(bot_reply)
+    except Exception as e:
+        logger.error(f"Error generating reply: {e}")
+        await update.message.reply_text("⚠️ Sorry, something went wrong. Please try again.")
 
 # --------------------------
 # MAIN FUNCTION
