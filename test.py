@@ -1,6 +1,6 @@
 import logging
 import os
-import openai
+from openai import OpenAI
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -8,10 +8,13 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # CONFIGURATION
 # --------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TELEGRAM_TOKEN or not openai.api_key:
+if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
     raise ValueError("❌ TELEGRAM_TOKEN or OPENAI_API_KEY not set in environment variables")
+
+# OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Enable logging
 logging.basicConfig(
@@ -39,14 +42,14 @@ async def generate_reply(user_id, user_message: str) -> str:
     user_histories[user_id].append({"role": "user", "content": user_message})
 
     # get GPT reply
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=user_histories[user_id],
         max_tokens=400,
         temperature=0.9
     )
 
-    reply = response.choices[0].message["content"]
+    reply = response.choices[0].message.content
 
     # add bot reply to history
     user_histories[user_id].append({"role": "assistant", "content": reply})
@@ -58,7 +61,7 @@ async def generate_reply(user_id, user_message: str) -> str:
 # --------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "👋 Hello, I am *InsightED Bot* 🌸 — your friendly study companion!\n\n"
+        "👋 Hello, I am *codered* 🌸 — your friendly study companion!\n\n"
         "I’ll help you stay strong even if you feel low about marks, attendance, or finances. 💡\n\n"
         "👉 Use /scholarships to explore financial aid options."
     )
@@ -66,7 +69,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
-        "🌟 I am *InsightED Bot*, your supportive guide!\n\n"
+        "🌟 I am *codered*, your supportive guide!\n\n"
         "💬 You can share your worries with me, like:\n"
         "- 'I am scared of failing in exams'\n"
         "- 'I have low attendance'\n"
