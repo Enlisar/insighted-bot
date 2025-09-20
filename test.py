@@ -1,6 +1,6 @@
 import logging
 import os
-from groq import Groq
+import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -8,13 +8,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # CONFIGURATION
 # --------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-if not TELEGRAM_TOKEN or not GROQ_API_KEY:
-    raise ValueError("❌ TELEGRAM_TOKEN or OPENAI_API_KEY not set in environment variables")
-
-# Groq client
-client = Groq(api_key=GROQ_API_KEY)
+if not TELEGRAM_TOKEN or not OPENROUTER_API_KEY:
+    raise ValueError("❌ TELEGRAM_TOKEN or OPENROUTER_API_KEY not set in environment variables")
 
 # Enable logging
 logging.basicConfig(
@@ -28,7 +25,7 @@ logger = logging.getLogger(__name__)
 user_histories = {}
 
 # --------------------------
-# GPT FUNCTION USING GROQ
+# GPT FUNCTION USING OPENROUTER
 # --------------------------
 async def generate_reply(user_id, user_message: str) -> str:
     if user_id not in user_histories:
@@ -38,20 +35,32 @@ async def generate_reply(user_id, user_message: str) -> str:
              "Be supportive, uplifting, and engaging. Encourage long conversations."}
         ]
 
-    # add user message
+    # Add user message
     user_histories[user_id].append({"role": "user", "content": user_message})
 
-    # get Groq chat reply
-    response = client.chat.completions.create(
-        model="groq-3.5-mini",
-        messages=user_histories[user_id],
-        max_tokens=400,
-        temperature=0.9
+    # Call OpenRouter API
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "openchat/openchat-7b:free",  # free model
+            "messages": user_histories[user_id],
+            "max_tokens": 400,
+            "temperature": 0.9
+        }
     )
 
-    reply = response.choices[0].message.content
+    if response.status_code != 200:
+        logger.error(f"OpenRouter Error: {response.text}")
+        return "⚠️ Sorry, AI is currently unavailable. Try again later."
 
-    # add bot reply to history
+    data = response.json()
+    reply = data["choices"][0]["message"]["content"]
+
+    # Add bot reply to history
     user_histories[user_id].append({"role": "assistant", "content": reply})
 
     return reply
@@ -60,45 +69,14 @@ async def generate_reply(user_id, user_message: str) -> str:
 # BOT COMMANDS
 # --------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_text = (
-        "👋 Hello, I am *InsightED Bot* 🌸 — your friendly study companion!\n\n"
-        "I’ll help you stay strong even if you feel low about marks, attendance, or finances. 💡\n\n"
-        "👉 Use /scholarships to explore financial aid options."
+    await update.message.reply_markdown(
+        "👋 Hello, I am *InsightED Bot* 🌸 — your friendly study companion!"
     )
-    await update.message.reply_markdown(welcome_text)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = (
-        "🌟 I am *InsightED Bot*, your supportive guide!\n\n"
-        "💬 You can share your worries with me, like:\n"
-        "- 'I am scared of failing in exams'\n"
-        "- 'I have low attendance'\n"
-        "- 'I may not afford fees'\n\n"
-        "Commands:\n"
-        "👉 /start - Introduction\n"
-        "👉 /help - Guidance\n"
-        "👉 /scholarships - Scholarship list 🎓"
+    await update.message.reply_markdown(
+        "🌟 I am *InsightED Bot*, your supportive guide!\n\n👉 Use /start to begin chatting."
     )
-    await update.message.reply_markdown(help_text)
-
-async def scholarships(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    scholarships_text = (
-        "🎓 *Scholarship Opportunities for Students* \n\n"
-        "🌍 *Global Scholarships:*\n"
-        "1. [UNESCO Fellowships](https://www.unesco.org/fellowships)\n"
-        "2. [Chevening Scholarships](https://www.chevening.org/)\n"
-        "3. [Erasmus+](https://erasmus-plus.ec.europa.eu/)\n\n"
-        "🇮🇳 *Indian Scholarships:*\n"
-        "1. [National Scholarship Portal](https://scholarships.gov.in/)\n"
-        "2. [INSPIRE Scholarship](https://online-inspire.gov.in/)\n"
-        "3. [AICTE Pragati & Saksham](https://www.aicte-india.org/schemes/students-development-schemes)\n\n"
-        "🇺🇸 *US Scholarships:*\n"
-        "1. [Fulbright Program](https://foreign.fulbrightonline.org/)\n"
-        "2. [Gates Millennium Scholars](https://gmsp.org/)\n"
-        "3. [FAFSA Grants](https://studentaid.gov/)\n\n"
-        "💡 Apply early & keep documents ready!"
-    )
-    await update.message.reply_markdown(scholarships_text)
 
 # --------------------------
 # CHAT HANDLER
@@ -114,7 +92,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(bot_reply)
     except Exception as e:
         logger.error(f"Error generating reply: {e}")
-        await update.message.reply_text("⚠️ Sorry, something went wrong. Please try again.")
+        await update.message.reply_text("⚠️ Something went wrong. Please try again.")
 
 # --------------------------
 # MAIN FUNCTION
@@ -122,15 +100,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("scholarships", scholarships))
-
-    # Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("🤖 InsightED Bot is running with Groq...")
+    print("🤖 InsightED Bot is running with OpenRouter...")
     app.run_polling()
 
 if __name__ == "__main__":
