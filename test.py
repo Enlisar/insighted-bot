@@ -9,7 +9,7 @@ from langdetect import detect
 # CONFIGURATION
 # --------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # Set in Railway/your env
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") 
 
 if not TELEGRAM_TOKEN or not OPENROUTER_API_KEY:
     raise ValueError("❌ TELEGRAM_TOKEN or OPENROUTER_API_KEY not set in environment variables")
